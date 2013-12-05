@@ -1,0 +1,50 @@
+#!/usr/bin/ruby
+
+require "cgi"
+
+#lynx --dump http://www.google.com.br/search?q=%22Consumo+Consciente%22+site%3Aeita.org.br | grep Aproximadamente | sed -e 's/[^0-9 ]//g' | sed -e 's/  / /g' | sed 's/^ *//g' | cut -d' ' -f1
+
+def url_simples attr
+  url = attr[/:\/\/([^\/]+)/,1]
+  url = url.gsub(/^www\./,'') unless url.nil?
+end
+
+palavras_chave = []
+
+File.open('palavras_chave.txt').each do |line|
+  palavras_chave << line
+end
+
+universo_de_sites = []
+
+File.open('universo_de_sites.txt').each do |line|
+  line = line.gsub(/\n/,'').split(';')
+  universo_de_sites << {
+	  :nome => line[0],
+	  :url_completa => line[1],
+	  :url_simples => url_simples(line[1])
+	}
+end
+
+File.open('resultados.csv', 'a') do  |file| 
+  file.sync = true
+  puts "Sites:"
+  universo_de_sites.each do |site|
+    resultados = []
+    printf "  " + site[:nome] + " "
+    palavras_chave.each do |palavra|
+      query_string = CGI::escape(palavra + ' site:' + site[:url_simples])
+      command =  "lynx --dump http://br.bing.com/search?q=#{query_string} | grep results | sed -e 's/[^0-9 ]//g' | sed -e 's/  / /g' | sed 's/^ *//g' | cut -d' ' -f1"
+      res = `#{command}`
+      #puts command
+      res =  res.empty? ? 0 : res.to_i
+      printf "."
+      resultados << res
+    end 
+    printf "\n"
+    site[:resultados] = resultados
+    #puts resultados
+    file.write(site[:nome] + ';' + site[:resultados].join(';') + "\n") 
+  end
+end
+
